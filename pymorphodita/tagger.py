@@ -2,6 +2,8 @@ from . import log
 
 from collections import namedtuple
 from collections.abc import Sequence
+from lazy import lazy
+from functools import lru_cache
 import ufal.morphodita as ufal
 
 Token = namedtuple("Token", "word lemma tag")
@@ -15,13 +17,11 @@ class Tagger:
     _NO_TOKENIZER = ("No tokenizer defined for tagger {!r}! Please provide "
                      "pre-tokenized and sentence-split input.")
 
-    def __init__(self, tagger, guesser=False):
+    def __init__(self, tagger):
         """Create a ``Tagger`` object.
 
         :param tagger: Path to the pre-compiled tagging models.
         :type tagger: str
-        :param guesser: Whether or not to use a guesser with this tagger.
-        :type guesser: bool
 
         """
         self._tpath = tagger
@@ -29,16 +29,44 @@ class Tagger:
         self._tagger = ufal.Tagger.load(tagger)
         if self._tagger is None:
             raise RuntimeError("Unable to load tagger from {!r}!".format(tagger))
+        self._morpho = self._tagger.getMorpho()
         self._forms = ufal.Forms()
         self._lemmas = ufal.TaggedLemmas()
         self._tokens = ufal.TokenRanges()
         self._tokenizer = self._tagger.newTokenizer()
         if self._tokenizer is None:
             log.warn(self._NO_TOKENIZER.format(tagger))
-        self._vtokenizer = ufal.Tokenizer_newVerticalTokenizer()
 
-    def tag(self, text, sents=False, guesser=False):
-        """Tag text.
+    @lazy
+    def _vtokenizer(self):
+        return ufal.Tokenizer_newVerticalTokenizer()
+
+    @lazy
+    def _pdt_to_conll2009_converter(self):
+        return ufal.TagsetConverter_newPdtToConll2009Converter()
+
+    @lazy
+    def _strip_lemma_comment_converter(self):
+        return ufal.TagsetConverter_newStripLemmaCommentConverter(self._morpho)
+
+    @lazy
+    def _strip_lemma_id_converter(self):
+        return ufal.TagsetConverter_newStripLemmaIdConverter(self._morpho)
+
+    @lru_cache(maxsize=16)
+    def _get_converter(self, convert):
+        try:
+            converter = (getattr(self, "_" + convert + "_converter")
+                         if convert is not None else None)
+        except AttributeError as e:
+            converters = [a[1:-10] for a in dir(self) if "converter" in a
+                          and a != "_get_converter"]
+            raise ValueError("Unknown converter {!r}. Available converters: "
+                             "{!r}.".format(convert, converters)) from e
+        return converter
+
+    def tag(self, text, sents=False, guesser=False, convert=None):
+        """Perform morphological tagging and lemmatization on text.
 
         If ``text`` is a string, sentence-split, tokenize and tag that string.
         If it's a sequence of sequences (typically a list of lists, and with
@@ -55,6 +83,10 @@ class Tagger:
         :param guesser: Whether to use the morphological guesser provided with
         the tagger (if available).
         :type guesser: bool
+        :param convert: Conversion strategy to apply to lemmas and / or tags
+        before outputting them.
+        :type convert: str, one of "pdt_to_conll2009", "strip_lemma_comment" or
+        "strip_lemma_id", or None if no conversion is required
 
         >>> list(t.tag("Je zima. Bude sněžit."))
         [Token(word='Je', lemma='být', tag='VB-S---3P-AA---'),
@@ -82,28 +114,39 @@ class Tagger:
 
         """
         if isinstance(text, str):
-            yield from self._tag_untokenized(text, sents, guesser)
+            yield from self.tag_untokenized(text, sents, guesser, convert)
         elif (isinstance(text, Sequence)
               and len(text) > 0
               and isinstance(text[0], Sequence)
               and not isinstance(text[0], str)):
-            yield from self._tag_tokenized(text, sents, guesser)
+            yield from self.tag_tokenized(text, sents, guesser, convert)
         else:
             raise TypeError(
                 "Please provide a str or a sequence of sequences (not "
                 "strings!) of str as the ``text`` parameter.")
 
-    def _tag_untokenized(self, text, sents, guesser):
+    def tag_untokenized(self, text, sents=False, guesser=False, convert=None):
+        """This is the method ``Tagger.tag()`` delegates to when ``text`` is a str. See
+        docstring for ``Tagger.tag()`` for details about parameters.
+
+        """
+        converter = self._get_converter(convert)
         if self._tokenizer is None:
             raise RuntimeError(self._NO_TOKENIZER.format(self._tpath))
-        yield from self._tag(text, self._tokenizer, sents, guesser)
+        yield from self._tag(text, self._tokenizer, sents, guesser, converter)
 
-    def _tag_tokenized(self, text, sents, guesser):
+    def tag_tokenized(self, text, sents=False, guesser=False, convert=None):
+        """This is the method ``Tagger.tag()`` delegates to when ``text`` is a sequence
+        of sequences of str. See docstring for ``Tagger.tag()`` for details
+        about parameters.
+
+        """
+        converter = self._get_converter(convert)
         for sent in text:
             yield from self._tag(
-                "\n".join(sent), self._vtokenizer, sents, guesser)
+                "\n".join(sent), self._vtokenizer, sents, guesser, converter)
 
-    def _tag(self, text, tokenizer, sents, guesser):
+    def _tag(self, text, tokenizer, sents, guesser, converter):
         tagger, forms, lemmas, tokens = (self._tagger, self._forms,
                                          self._lemmas, self._tokens)
         tokenizer.setText(text)
@@ -114,6 +157,8 @@ class Tagger:
                 lemma = lemmas[i]
                 t = tokens[i]
                 word = text[t.start : t.start + t.length]
+                if converter is not None:
+                    converter.convert(lemma)
                 token = Token(word, lemma.lemma, lemma.tag)
                 if sents:
                     s.append(token)

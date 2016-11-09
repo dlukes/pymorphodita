@@ -9,7 +9,8 @@ setup(
     license="GPLv3",
     packages=["pymorphodita"],
     install_requires=[
-        "ufal.morphodita (>=1.9)"
+        "ufal.morphodita (>=1.9)",
+        "lazy"
     ],
     zip_safe=True
 )
