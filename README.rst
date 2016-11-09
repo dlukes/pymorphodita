@@ -28,19 +28,23 @@ is available through PyMorphoDiTa (tagging features).
 Installation
 ============
 
-.. code-block:: bash
+.. code:: bash
 
    $ pip3 install git+https://github.com/dlukes/pymorphodita
 
 Usage
 =====
 
-Initialize a new tagger::
+Initialize a new tagger:
+
+.. code:: python
 
    >>> from pymorphodita import Tagger
    >>> t = Tagger("path/to/czech-morfflex-pdt-160310.tagger")
 
-Sentence split, tokenize, tag and lemmatize a text represented as a string::
+Sentence split, tokenize, tag and lemmatize a text represented as a string:
+
+.. code:: python
 
    >>> list(t.tag("Je zima. Bude sněžit."))
    [Token(word='Je', lemma='být', tag='VB-S---3P-AA---'),
@@ -58,7 +62,9 @@ Sentence split, tokenize, tag and lemmatize a text represented as a string::
      Token(word='.', lemma='.', tag='Z:-------------')]]
 
 Tag and lemmatize an already sentence-split and tokenized piece of text,
-represented as a sequence of sequences of strings::
+represented as a sequence of sequences of strings:
+
+.. code:: python
 
    >>> list(t.tag([['Je', 'zima', '.'], ['Bude', 'sněžit', '.']]))
    [Token(word='Je', lemma='být', tag='VB-S---3P-AA---'),
@@ -68,7 +74,7 @@ represented as a sequence of sequences of strings::
     Token(word='sněžit', lemma='sněžit_:T', tag='Vf--------A----'),
     Token(word='.', lemma='.', tag='Z:-------------')]
 
-Head over to the `API docs <>`_ for more details.
+Check out the docstrings of the objects in the package for more details.
 
 Requirements
 ============
