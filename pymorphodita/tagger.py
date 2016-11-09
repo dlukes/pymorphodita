@@ -1,7 +1,7 @@
 from . import log
 
 from collections import namedtuple
-from collections.abc import Sequence
+from collections.abc import Iterable
 from lazy import lazy
 from functools import lru_cache
 import ufal.morphodita as ufal
@@ -16,6 +16,8 @@ class Tagger:
     """
     _NO_TOKENIZER = ("No tokenizer defined for tagger {!r}! Please provide "
                      "pre-tokenized and sentence-split input.")
+    _TEXT_REQS = ("Please provide a string or an iterable of iterables (not "
+                  "strings!) of strings as the ``text`` parameter.")
 
     def __init__(self, tagger):
         """Create a ``Tagger`` object.
@@ -69,14 +71,13 @@ class Tagger:
         """Perform morphological tagging and lemmatization on text.
 
         If ``text`` is a string, sentence-split, tokenize and tag that string.
-        If it's a sequence of sequences (typically a list of lists, and with
-        the exception of a list of strings), then take each nested sequence as
-        a separate sentence and tag it, honoring the provided sentence
-        boundaries and tokenization.
+        If it's an iterable of iterables (typically a list of lists), then take
+        each nested iterable as a separate sentence and tag it, honoring the
+        provided sentence boundaries and tokenization.
 
         :param text: Input text.
-        :type text: Either str (tokenization is left to the tagger) or sequence
-        of sequences (not strings!) of str, representing individual sentences.
+        :type text: Either str (tokenization is left to the tagger) or iterable
+        of iterables (of str), representing individual sentences.
         :param sents: Whether to signal sentence boundaries by outputting a
         sequence of lists (sentences).
         :type sents: bool
@@ -115,19 +116,20 @@ class Tagger:
         """
         if isinstance(text, str):
             yield from self.tag_untokenized(text, sents, guesser, convert)
-        elif (isinstance(text, Sequence)
-              and len(text) > 0
-              and isinstance(text[0], Sequence)
-              and not isinstance(text[0], str)):
+        # The other accepted type of input is an iterable of iterables of
+        # strings, but we only do a partial check whether the top-level object
+        # is an Iterable, because it would have to be consumed in order to
+        # inspect its first item. A second check which signals the frequent
+        # mistake of passing an iterable of strings (which results in tagging
+        # each character separately) occurs in ``Tagger.tag_tokenized()``.
+        elif isinstance(text, Iterable):
             yield from self.tag_tokenized(text, sents, guesser, convert)
         else:
-            raise TypeError(
-                "Please provide a str or a sequence of sequences (not "
-                "strings!) of str as the ``text`` parameter.")
+            raise TypeError(self._TEXT_REQS)
 
     def tag_untokenized(self, text, sents=False, guesser=False, convert=None):
-        """This is the method ``Tagger.tag()`` delegates to when ``text`` is a str. See
-        docstring for ``Tagger.tag()`` for details about parameters.
+        """This is the method ``Tagger.tag()`` delegates to when ``text`` is a
+        string. See docstring for ``Tagger.tag()`` for details about parameters.
 
         """
         converter = self._get_converter(convert)
@@ -136,13 +138,18 @@ class Tagger:
         yield from self._tag(text, self._tokenizer, sents, guesser, converter)
 
     def tag_tokenized(self, text, sents=False, guesser=False, convert=None):
-        """This is the method ``Tagger.tag()`` delegates to when ``text`` is a sequence
-        of sequences of str. See docstring for ``Tagger.tag()`` for details
-        about parameters.
+        """This is the method ``Tagger.tag()`` delegates to when ``text`` is an
+        iterable of iterables of strings. See docstring for ``Tagger.tag()``
+        for details about parameters.
 
         """
         converter = self._get_converter(convert)
         for sent in text:
+            # refuse to process if sent is a string or not an iterable, because
+            # that would result in tagging each character separately, which is
+            # nonsensical
+            if isinstance(sent, str) or not isinstance(sent, Iterable):
+                raise TypeError(self._TEXT_REQS)
             yield from self._tag(
                 "\n".join(sent), self._vtokenizer, sents, guesser, converter)
 

@@ -62,7 +62,7 @@ Sentence split, tokenize, tag and lemmatize a text represented as a string:
      Token(word='.', lemma='.', tag='Z:-------------')]]
 
 Tag and lemmatize an already sentence-split and tokenized piece of text,
-represented as a sequence of sequences of strings:
+represented as an iterable of iterables of strings:
 
 .. code:: python
 
