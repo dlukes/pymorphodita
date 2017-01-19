@@ -2,6 +2,11 @@
 PyMorphoDiTa
 ============
 
+.. _overview:
+
+Overview
+========
+
 A slightly more (newbie) user friendly but also probably somewhat less efficient
 wrapper around the default Swig-generated Python bindings for the `MorphoDiTa
 <https://github.com/ufal/morphodita>`_ morphological tagging and lemmatization
@@ -34,6 +39,35 @@ Installation
 
 Usage
 =====
+
+If stuck, check out the docstrings of the modules and objects in the package
+for more details. Or directly the code, they're just straightforward wrappers,
+not rocket science :)
+
+Tokenization
+------------
+
+In addition to tokenization, the MorphoDiTa tokenizers perform sentence
+splitting at the same time.
+
+The easiest way to get started is to import one of the following callables from
+``pymorphodita.tokenizer`` ``vertical``, ``czech``, ``english`` or ``generic``,
+and use it like so:
+
+.. code:: python
+
+   >>> from pymorphodita import tokenizer
+   >>> for sentence in tokenizer.generic("foo bar baz"):
+   ...     print(sentence)
+   ...
+   ['foo', 'bar', 'baz']
+
+
+Tagging
+-------
+
+**NOTE**: Unlike tokenization, tagging in MorphoDiTa requires you to supply
+your own pre-trained tagging models (see :ref:`overview` above).
 
 Initialize a new tagger:
 
@@ -73,8 +107,6 @@ represented as an iterable of iterables of strings:
     Token(word='Bude', lemma='být', tag='VB-S---3F-AA---'),
     Token(word='sněžit', lemma='sněžit_:T', tag='Vf--------A----'),
     Token(word='.', lemma='.', tag='Z:-------------')]
-
-Check out the docstrings of the objects in the package for more details.
 
 Requirements
 ============
