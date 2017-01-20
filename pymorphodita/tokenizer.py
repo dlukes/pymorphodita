@@ -124,6 +124,11 @@ class Tokenizer:
         . .
 
         """
+        # this is more elegant than just segfaulting in the MorphoDiTa C++ library if None is
+        # passed...
+        if not isinstance(text, str):
+            raise TypeError(
+                "``text`` should be a str, you passed in {}.".format(type(text)))
         self._tokenizer.setText(text)
         while self._tokenizer.nextSentence(self._forms, self._tokens):
             yield list(self._forms)
