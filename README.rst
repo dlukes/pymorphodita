@@ -50,14 +50,14 @@ Tokenization
 In addition to tokenization, the MorphoDiTa tokenizers perform sentence
 splitting at the same time.
 
-The easiest way to get started is to import one of the following callables from
-``pymorphodita.tokenizer`` ``vertical``, ``czech``, ``english`` or ``generic``,
-and use it like so:
+The easiest way to get started is to import one of the following
+pre-instantiated tokenizers from ``pymorphodita.tokenizer``: ``vertical``,
+``czech``, ``english`` or ``generic``, and use it like so:
 
 .. code:: python
 
-   >>> from pymorphodita import tokenizer
-   >>> for sentence in tokenizer.generic("foo bar baz"):
+   >>> from pymorphodita.tokenizer import generic
+   >>> for sentence in generic.tokenize("foo bar baz"):
    ...     print(sentence)
    ...
    ['foo', 'bar', 'baz']

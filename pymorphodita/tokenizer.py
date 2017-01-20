@@ -2,14 +2,21 @@
 
 In addition to tokenization, the MorphoDiTa tokenizers perform sentence splitting at the same time.
 
-The easiest way to get started is to import one of the following callables: ``vertical``, ``czech``,
-``english`` or ``generic``, and use it like so:
+The easiest way to get started is to import one of the following pre-instantiated tokenizers:
+``vertical``, ``czech``, ``english`` or ``generic``, and use it like so:
 
->>> from pymorphodita import tokenizer
->>> for sentence in tokenizer.generic("foo bar baz"):
+>>> from pymorphodita.tokenizer import generic
+>>> for sentence in generic.tokenize("foo bar baz"):
 ...     print(sentence)
 ...
 ['foo', 'bar', 'baz']
+
+If you want more flexibility, e.g. for tokenizing several in texts in parallel with the same type of
+tokenizer, then create your own objects (each tokenizer can only be tokenizing one text at a time!):
+
+>>> from pymorphodita.tokenizer import Tokenizer
+>>> my_tokenizer1 = Tokenizer("generic")
+>>> my_tokenizer2 = Tokenizer("generic")
 
 """
 import ufal.morphodita as ufal
@@ -21,7 +28,7 @@ class Tokenizer:
     Usage:
 
     >>> t = Tokenizer("generic")
-    >>> for sentence in t("foo bar baz"):
+    >>> for sentence in t.tokenize("foo bar baz"):
     ...     print(sentence)
     ...
     ['foo', 'bar', 'baz']
@@ -38,7 +45,7 @@ class Tokenizer:
         :param tokenizer_type: Type of the requested tokenizer, depends on the tokenizer
         constructors made available on the ``tokenizer`` class in MorphoDiTa. Typically one of
         "vertical", "czech", "english" and "generic".
-        :type tokenizer_constructor_name: str
+        :type tokenizer_type: str
 
         """
         constructor = "new" + tokenizer_type.capitalize() + "Tokenizer"
@@ -46,11 +53,78 @@ class Tokenizer:
         self._forms = ufal.Forms()
         self._tokens = ufal.TokenRanges()
 
-    def __call__(self, text):
-        self._tokenizer.setText(text)
-        return self
+    def tokenize(self, text):
+        """Tokenize ``text``.
 
-    def __iter__(self):
+        :param text: Text to tokenize.
+        :type text: str
+
+        The method returns a generator of sentences as lists of strings. The underlying tokenizer
+        object is shared by all such generators, which means this probably doesn't do what you want
+        it to:
+
+        >>> t = Tokenizer("generic")
+        >>> toks1 = t.tokenize("Foo bar baz. Bar baz qux.")
+        >>> toks2 = t.tokenize("A b c. D e f. G h i.")
+        >>> for s1, s2 in zip(toks1, toks2):
+        ...     for t1, t2 in zip(s1, s2):
+        ...         print(t1, t2)
+        Foo A
+        bar b
+        baz c
+        . .
+        D G
+        e h
+        f i
+        . .
+
+        What happens in the ``zip()`` call is that the underlying tokenizer's text is first set to
+        ``"Foo bar baz. Bar baz qux."``, and the sentence ``['Foo', 'bar', 'baz', '.']`` is yielded
+        by ``toks1``. Then it is set to ``"A b c. D e f."`` and ``['A', 'b', 'c', '.']`` is yielded
+        by ``toks2``. These two values are zipped and bound to ``(s1, s2)`` in the first iteration
+        of the outer for-loop. From this point on, the text doesn't change anymore (we're in the
+        loop yielding individual sentences), so **toks1** (now using the same text as ``toks2``)
+        yields ``['D', 'e', 'f', '.']`` and **toks2** the last ``['G', 'h', 'i', '.']``. These
+        become ``(s1, s2)`` in the second and final iteration of the for-loop, because after this,
+        both ``toks1`` and ``toks2`` (since they ended up with the same text) are exhausted.
+
+        For the use case above, either create multiple tokenizers:
+
+        >>> t1 = Tokenizer("generic")
+        >>> t2 = Tokenizer("generic")
+        >>> toks1 = t1.tokenize("Foo bar baz. Bar baz qux.")
+        >>> toks2 = t2.tokenize("A b c. D e f. G h i.")
+        >>> for s1, s2 in zip(toks1, toks2):
+        ...     for t1, t2 in zip(s1, s2):
+        ...         print(t1, t2)
+        Foo A
+        bar b
+        baz c
+        . .
+        Bar D
+        baz e
+        qux f
+        . .
+
+        Or exhaust the generators and zip the resulting lists:
+
+        >>> t = Tokenizer("generic")
+        >>> toks1 = list(t.tokenize("Foo bar baz. Bar baz qux."))
+        >>> toks2 = list(t.tokenize("A b c. D e f. G h i."))
+        >>> for s1, s2 in zip(toks1, toks2):
+        ...     for t1, t2 in zip(s1, s2):
+        ...         print(t1, t2)
+        Foo A
+        bar b
+        baz c
+        . .
+        Bar D
+        baz e
+        qux f
+        . .
+
+        """
+        self._tokenizer.setText(text)
         while self._tokenizer.nextSentence(self._forms, self._tokens):
             yield list(self._forms)
 
